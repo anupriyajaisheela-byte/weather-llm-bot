@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WeatherGPT</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="chat-root">
+    <header class="chat-header">WeatherGPT</header>
+    <main id="chat" class="chat-window"></main>
+    <form id="form" class="chat-input" autocomplete="off">
+      <input id="location" placeholder="Location (city or lat,lon) — optional" />
+      <textarea id="prompt" placeholder="Ask about the weather..."></textarea>
+      <button type="submit">Send</button>
+    </form>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
