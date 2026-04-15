@@ -2,51 +2,66 @@ import os
 import httpx
 import logging
 
+# Set up logging to catch errors in the Render terminal
 logger = logging.getLogger("uvicorn.error")
 
 async def fetch_weather(location: str):
-    """Fetch current weather for a city name or 'lat,lon'."""
+    """
+    Fetches real-time weather from OpenWeather.
+    Supports both city names ("Chennai") and coordinates ("13.08,80.27").
+    """
     api_key = os.getenv("OPENWEATHER_API_KEY")
     
     if not api_key:
-        logger.error("OPENWEATHER_API_KEY is missing!")
+        logger.error("CRITICAL: OPENWEATHER_API_KEY is missing from environment variables.")
         return None
 
-    # 1. Prepare URL
-    base = "https://api.openweathermap.org/data/2.5/weather"
-    params = {"appid": api_key, "units": "metric"}
+    # 1. Configuration
+    base_url = "https://api.openweathermap.org/data/2.5/weather"
+    # Units=metric ensures Celsius. Language=en is default.
+    params = {
+        "appid": api_key,
+        "units": "metric"
+    }
     
-    # Handle lat,lon or city name
+    # 2. Handle Location Type
+    # Checks if input is "lat,lon" (e.g., from a map or precise extraction)
     if "," in location and all(p.strip().replace('.', '').replace('-', '').isdigit() for p in location.split(",")):
         lat, lon = location.split(",")
         params.update({"lat": lat.strip(), "lon": lon.strip()})
     else:
-        params.update({"q": location})
+        # Standard city name search
+        params.update({"q": location.strip()})
 
-    # 2. Make the Request
+    # 3. API Call
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(base, params=params)
+            response = await client.get(base_url, params=params)
             
-            # This is your debugging line for Render Logs
-            print(f"DEBUG WEATHER API: Status {resp.status_code}, Body: {resp.text}")
+            # Print to Render logs for debugging
+            print(f"DEBUG WEATHER API: Requesting {location} - Status {response.status_code}")
 
-            if resp.status_code != 200:
-                logger.error(f"Weather API Error: {resp.status_code}")
-                return None
-            
-            j = resp.json()
+            if response.status_code == 200:
+                data = response.json()
 
-            # 3. Format the data clearly for llm.py
-            # We provide BOTH the full 'main' dict and simplified keys to be safe
-            return {
-                "name": j.get('name'),
-                "main": j.get('main', {}),
-                "weather": j.get('weather', [{}]),
-                "location_name": f"{j.get('name')}, {j.get('sys', {}).get('country')}",
-                "temp_c": j.get('main', {}).get('temp'),
-                "weather_summary": j.get('weather')[0].get('description') if j.get('weather') else "clear"
-            }
-    except Exception as e:
-        logger.error(f"Weather Fetch Exception: {str(e)}")
+                # 4. Format the "Clean" Dictionary for the AI
+                # This structure is exactly what your llm.py expects
+                return {
+                    "name": data.get("name"),
+                    "country": data.get("sys", {}).get("country"),
+                    "temp_c": data.get("main", {}).get("temp"),
+                    "feels_like": data.get("main", {}).get("feels_like"),
+                    "humidity": data.get("main", {}).get("humidity"),
+                    "wind_speed": data.get("wind", {}).get("speed"),
+                    "weather_summary": data.get("weather", [{}])[0].get("description", "clear")}
+            # Non-200 responses are handled below
+    except httpx.RequestError as e:
+        logger.error(f"Weather API request error for {location}: {e}")
         return None
+    except Exception as e:
+        logger.exception(f"Unexpected error fetching weather for {location}: {e}")
+        return None
+
+    # If we reach here, either the response wasn't 200 or parsing failed
+    logger.debug(f"Weather API returned non-200 for {location}: {response.status_code if 'response' in locals() else 'no response'}")
+    return None
