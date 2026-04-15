@@ -6,14 +6,22 @@ import logging
 logger = logging.getLogger("uvicorn.error")
 
 async def fetch_weather(location: str):
-    """
-    Fetches real-time weather from OpenWeather.
-    Supports both city names ("Chennai") and coordinates ("13.08,80.27").
-    """
     api_key = os.getenv("OPENWEATHER_API_KEY")
-    
     if not api_key:
-        logger.error("CRITICAL: OPENWEATHER_API_KEY is missing from environment variables.")
+        return None
+
+    # Use 'units=metric' for Celsius
+    url = f"https://api.openweathermap.org/data/2.5/weather?q={location}&appid={api_key.strip()}&units=metric"
+    
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url)
+            print(f"DEBUG WEATHER API: {resp.status_code}") # Watch for 200 in Render logs
+            
+            if resp.status_code == 200:
+                return resp.json() 
+            return None
+    except Exception:
         return None
 
     # 1. Configuration
