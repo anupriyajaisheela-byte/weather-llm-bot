@@ -57,12 +57,33 @@ def simple_reply(lang: str, weather: dict):
     return f"In {loc}: It's {desc} with a temperature of {temp}°C."
 
 async def get_response(user_message, weather_data=None, history=None):
-    # Try the AI first
-    prompt = f"User asked: {user_message}. Context Weather: {weather_data}"
-    ai_response = await _call_hf(prompt)
+    history = history or []
     
-    if ai_response:
-        return ai_response
+    # 1. Force the weather data into a clear string
+    weather_context = "No live weather data available."
+    if weather_data and isinstance(weather_data, dict):
+        # Extract fields specifically for the AI to read
+        temp = weather_data.get('main', {}).get('temp', 'N/A')
+        desc = weather_data.get('weather', [{}])[0].get('description', 'clear')
+        hum = weather_data.get('main', {}).get('humidity', 'N/A')
+        city = weather_data.get('name', 'this location')
+        weather_context = f"Current weather in {city}: {temp}°C, {desc}, Humidity: {hum}%."
+
+    # 2. Update the System Prompt to be more strict
+    system_prompt = (
+        "You are WeatherGPT. You MUST use the provided WeatherData to answer. "
+        "If WeatherData is provided, do not say you don't have access to live data. "
+        "Respond concisely in the user's language."
+    )
+    
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(history)
+
+    # 3. Combine them into the final prompt
+    final_user_input = f"CONTEXT: {weather_context}\n\nUSER QUESTION: {user_message}"
+    messages.append({"role": "user", "content": final_user_input})
+
+    # ... rest of your _call_hf logic ...
         
     # If AI fails, use the safe fallback
     lang = 'hi' if any(word in user_message.lower() for word in ['मौसम', 'नमस्ते']) else 'en'
