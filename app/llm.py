@@ -50,9 +50,9 @@ async def _call_openai(messages):
 async def _call_hf(prompt_text):
     url = os.getenv("HF_API_URL") 
     api_key = os.getenv("HF_API_KEY")
+    model_id = os.getenv("HF_MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
     
     if not url or not api_key:
-        logger.warning("HF credentials missing in Env Vars.")
         return None
 
     headers = {
@@ -60,23 +60,25 @@ async def _call_hf(prompt_text):
         "Content-Type": "application/json"
     }
 
-    # The payload should be simple for the Inference API
-    payload = {"inputs": prompt_text}
+    # The Router requires this specific format
+    payload = {
+        "model": model_id,
+        "messages": [{"role": "user", "content": prompt_text}],
+        "max_tokens": 500,
+        "temperature": 0.7
+    }
     
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, headers=headers, json=payload, timeout=20)
             
             if response.status_code != 200:
-                # This log will tell you exactly what Hugging Face doesn't like
                 logger.error(f"HF Error: {response.status_code} - {response.text}")
                 return None
                 
             result = response.json()
-            # Standard Inference API returns a list with generated_text
-            if isinstance(result, list) and len(result) > 0:
-                return result[0].get("generated_text", "").strip()
-            return str(result)
+            # The Router returns an OpenAI-style response
+            return result["choices"][0]["message"]["content"].strip()
                 
     except Exception as e:
         logger.error(f"HF Connection trouble: {str(e)}")
