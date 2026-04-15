@@ -117,13 +117,10 @@ async def get_response(user_message, weather_data=None, history=None):
     if resp: return resp
 
     # 3. Last Resort (Simple Logic)
-    # Change line 120 from this:
-# return f"Currently, I can see it's {weather_data.get('temp_c')}°C in {weather_data.get('location_name')}."
-
-# To this safer version:
     if weather_data and isinstance(weather_data, dict):
-          temp = weather_data.get('temp_c', 'N/A')
-          loc = weather_data.get('location_name', 'Unknown')
-          return f"Currently, I can see it's {temp}°C in {loc}."
-    else:
-          return "I've got the weather data, but I'm having trouble formatting it. How else can I help?"
+    # OpenWeather typically uses 'main' for temperature and 'name' for city
+    # We check both the direct key and the nested 'main' key to be safe
+        temp = weather_data.get('main', {}).get('temp', weather_data.get('temp', 'N/A'))
+        loc = weather_data.get('name', weather_data.get('location_name', 'Unknown'))
+    
+    return f"Currently, I can see it's {temp}°C in {loc}."
