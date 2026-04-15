@@ -87,43 +87,44 @@ async def get_response(user_message, weather_data=None, history=None):
     if MOCK_LLM:
         return f"[MOCK] Simulated reply based on: {user_message}"
 
-    # 1. Prepare Weather Context
+    # 1. Format the data string strictly
     if weather_data and isinstance(weather_data, dict):
-        # OpenWeather format: data['main']['temp']
         main = weather_data.get('main', {})
         temp = main.get('temp', weather_data.get('temp_c', 'N/A'))
         city = weather_data.get('name', weather_data.get('location_name', 'Unknown'))
         desc = weather_data.get('weather', [{}])[0].get('description', 'clear')
-        context_text = f"REAL-TIME DATA: In {city}, it is {temp}°C with {desc}."
+        # We call this "KNOWLEDGE" so the AI thinks it's a built-in factsheet
+        context_text = f"KNOWLEDGE: The current temperature in {city} is {temp}°C and conditions are {desc}."
     else:
-        context_text = "REAL-TIME DATA: Not available."
+        context_text = "KNOWLEDGE: No live data provided."
 
-    # 2. Build Messages
+    # 2. Stronger Instructions
     system_instruction = (
-        "You are WeatherGPT. You MUST use the REAL-TIME DATA provided. "
-        "Do not say you don't have access to live data. "
-        "Respond clearly and concisely."
+        "You are WeatherGPT. You are provided with 'KNOWLEDGE' about current conditions. "
+        "Use this KNOWLEDGE as your absolute source of truth. "
+        "Do NOT apologize for lacking real-time access; you HAVE the data in the KNOWLEDGE block."
     )
 
     messages = [{"role": "system", "content": system_instruction}]
     if history:
         messages.extend(history)
-    messages.append({"role": "user", "content": f"{context_text}\n\nUser Question: {user_message}"})
+    
+    # We put the KNOWLEDGE right at the end of the user message so it's fresh
+    messages.append({"role": "user", "content": f"{context_text}\n\nQuestion: {user_message}"})
 
-    # 3. Try OpenAI
+    # 3. Call Logic (OpenAI then HF)
     if OPENAI_AVAILABLE:
         resp = await _call_openai(messages)
-        if resp: return resp
+        if resp and "check a weather website" not in resp.lower(): 
+            return resp
 
-    # 4. Try Hugging Face
     if HF_AVAILABLE:
-        # Convert messages to a single string for HF
         prompt_text = "\n".join([m["content"] for m in messages])
         resp = await _call_hf(prompt_text)
         if resp: return resp
 
-    # 5. Last Resort Fallback Logic
     return handle_offline_fallback(user_message, weather_data)
+
 
 def handle_offline_fallback(user_message, weather_data):
     lang = detect_language(user_message)
