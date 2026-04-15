@@ -52,6 +52,7 @@ async def _call_hf(prompt_text):
     api_key = os.getenv("HF_API_KEY")
     
     if not url or not api_key:
+        logger.warning("HF credentials missing in Env Vars.")
         return None
 
     headers = {
@@ -59,34 +60,27 @@ async def _call_hf(prompt_text):
         "Content-Type": "application/json"
     }
 
-    # IMPORTANT: Ensure the payload matches what the HF Inference/Router expects
-    payload = {
-        "model": HF_MODEL_NAME, 
-        "messages": [{"role": "user", "content": prompt_text}],
-        "max_tokens": 500,
-        "temperature": 0.7,
-        "stream": False
-    }
+    # The payload should be simple for the Inference API
+    payload = {"inputs": prompt_text}
     
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, headers=headers, json=payload, timeout=20)
             
             if response.status_code != 200:
-                logger.error(f"HF Router Error: {response.status_code} - {response.text}")
+                # This log will tell you exactly what Hugging Face doesn't like
+                logger.error(f"HF Error: {response.status_code} - {response.text}")
                 return None
                 
             result = response.json()
-            if isinstance(result, list): # Some HF models return a list
-                return result[0].get("generated_text", str(result))
-            if "choices" in result: # Router/OpenAI format
-                return result["choices"][0]["message"]["content"]
-            return result.get("generated_text", str(result))
+            # Standard Inference API returns a list with generated_text
+            if isinstance(result, list) and len(result) > 0:
+                return result[0].get("generated_text", "").strip()
+            return str(result)
                 
     except Exception as e:
         logger.error(f"HF Connection trouble: {str(e)}")
         return None
-
 async def get_response(user_message, weather_data=None, history=None):
     history = history or []
     if MOCK_LLM:
