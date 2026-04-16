@@ -66,17 +66,19 @@ async def _call_hf(prompt_text):
         return None
 
 async def get_response(user_message, weather_data=None, history=None):
-    # 1. Format the data string strictly for context
-    # We check for "temp_c" or "name" because that's what your fetch_weather returns
+    # 1. Update this check to look for 'temp_c'
     if weather_data and ("temp_c" in weather_data or "main" in weather_data):
-        # Support both the 'clean' dict and the 'raw' API response
         temp = weather_data.get("temp_c") or weather_data.get("main", {}).get("temp")
         city = weather_data.get("name")
         desc = weather_data.get("weather_summary") or weather_data.get("weather", [{}])[0].get("description")
         
+        # This is the info the AI sees
         context_text = f"KNOWLEDGE: The current temperature in {city} is {temp}°C and conditions are {desc}."
     else:
+        # If this runs, the AI will think data is missing
         context_text = "KNOWLEDGE: No live data provided."
+
+    # ... (rest of your system instruction logic)
 
     # 2. Stronger Instructions
     system_instruction = (
@@ -127,13 +129,17 @@ def greeting_reply(lang):
     return f"{replies.get(lang, 'Hello!')} I can provide weather info if you give a location."
 
 def simple_reply(lang, weather):
-    # Check for name/temp_c instead of "main"
+    # Change the check from "main" to "temp_c"
     if not weather or ("temp_c" not in weather and "main" not in weather):
-        return "I don't have an LLM configured or live weather data right now."
+        return "Weather data is currently unavailable."
     
+    # Use the keys from your fetch_weather function
     temp = weather.get("temp_c") or weather.get("main", {}).get("temp")
     loc = weather.get("name", "location")
     
+    # Remove the "(Note: ...)" part entirely from these strings
     if lang == 'hi':
         return f"{loc} में तापमान {temp}°C है।"
+    
+    # This is what's currently returning your London message
     return f"In {loc}, the temperature is {temp}°C."
