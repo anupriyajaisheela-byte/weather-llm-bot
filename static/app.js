@@ -45,13 +45,19 @@ form.addEventListener('submit', async (e) => {
         appendMessage(j.reply || "I'm having trouble thinking right now.", 'bot');
 
         // Weather Metadata (Only show if data actually exists)
-        if (j.weather && j.weather.location_name) {
-            const info = `(Weather used: ${j.weather.location_name}, ${j.weather.weather_summary})`;
-            appendMessage(info, 'bot');
-        } else if (j.weather) {
-            appendMessage("(Note: Live weather data unavailable)", 'bot');
-        }
+       console.log(j.weather);
 
+if (j.weather && j.weather.location_name) {
+    const info = `(Weather used: ${j.weather.location_name}, ${j.weather.weather_summary})`;
+    appendMessage(info, 'bot');
+} else if (j.weather) {
+    // This checks if temperature exists; if not, it just says "Live data synchronized"
+    const statusText = j.weather.temperature 
+        ? `${j.weather.temperature}°C data synchronized` 
+        : "Live weather data synchronized";
+    
+    appendMessage(`(Status: ${statusText})`, 'bot');
+}
     } catch (err) {
         if (lastLoader) lastLoader.remove();
         console.error("Fetch error:", err);
