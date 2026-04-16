@@ -46,18 +46,23 @@ form.addEventListener('submit', async (e) => {
 
         // Weather Metadata (Only show if data actually exists)
        // Weather Metadata (Synced with Python backend keys)
+// Weather Metadata (Synced with your latest Python backend)
 console.log("Weather Data Received:", j.weather);
 
-if (j.weather && j.weather.name) {
-    // We use .name and .temp_c because those are defined in your Python fetch_weather
-    const info = `(Weather used: ${j.weather.name}, ${j.weather.weather_summary})`;
+if (j.weather) {
+    // 1. Use 'name' and 'weather_summary' (from your Python fetch_weather)
+    const city = j.weather.name || "Unknown Location";
+    const summary = j.weather.weather_summary || "Conditions active";
+    const info = `(Weather used: ${city}, ${summary})`;
     appendMessage(info, 'bot');
-    
-    // Optional: Add a small sync confirmation
-    appendMessage(`(Status: ${j.weather.temp_c}°C data synchronized)`, 'bot');
-} else if (j.weather) {
-    // Generic fallback if name is missing
-    appendMessage("(Status: Live weather data active)", 'bot');
+
+    // 2. Use 'temp_c' (from your Python fetch_weather)
+    const temp = j.weather.temp_c;
+    if (temp !== undefined && temp !== null) {
+        appendMessage(`(Status: ${temp}°C data synchronized)`, 'bot');
+    } else {
+        appendMessage(`(Status: Live data synchronized)`, 'bot');
+    }
 }
     } catch (err) {
         if (lastLoader) lastLoader.remove();
