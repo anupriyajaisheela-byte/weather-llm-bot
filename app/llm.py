@@ -67,10 +67,13 @@ async def _call_hf(prompt_text):
 
 async def get_response(user_message, weather_data=None, history=None):
     # 1. Format the data string strictly for context
-    if weather_data and "main" in weather_data:
-        temp = weather_data["main"].get("temp")
+    # We check for "temp_c" or "name" because that's what your fetch_weather returns
+    if weather_data and ("temp_c" in weather_data or "main" in weather_data):
+        # Support both the 'clean' dict and the 'raw' API response
+        temp = weather_data.get("temp_c") or weather_data.get("main", {}).get("temp")
         city = weather_data.get("name")
-        desc = weather_data["weather"][0].get("description")
+        desc = weather_data.get("weather_summary") or weather_data.get("weather", [{}])[0].get("description")
+        
         context_text = f"KNOWLEDGE: The current temperature in {city} is {temp}°C and conditions are {desc}."
     else:
         context_text = "KNOWLEDGE: No live data provided."
@@ -124,10 +127,13 @@ def greeting_reply(lang):
     return f"{replies.get(lang, 'Hello!')} I can provide weather info if you give a location."
 
 def simple_reply(lang, weather):
-    if not weather or "main" not in weather:
+    # Check for name/temp_c instead of "main"
+    if not weather or ("temp_c" not in weather and "main" not in weather):
         return "I don't have an LLM configured or live weather data right now."
-    temp = weather["main"].get("temp")
+    
+    temp = weather.get("temp_c") or weather.get("main", {}).get("temp")
     loc = weather.get("name", "location")
+    
     if lang == 'hi':
         return f"{loc} में तापमान {temp}°C है।"
     return f"In {loc}, the temperature is {temp}°C."
