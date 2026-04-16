@@ -18,10 +18,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Basic sanity check
+        env:
+          HF_API_KEY: ${{ secrets.HF_API_KEY }}
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
         run: |
-          python -c "import fastapi, httpx; print('ok')"
+          python -c "import fastapi, httpx; print('Environment check: ok')"
 
   build-and-push:
     needs: test
@@ -29,20 +32,32 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # Added id-token: write for secure authentication
       id-token: write
     steps:
       - uses: actions/checkout@v4
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
+          context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}:latest
+          # This is now correct and safe from case-sensitivity issues
+          tags: ghcr.io/anupriyajaisheela-byte/weather-chatbot:latest
           file: ./Dockerfile
 
-# This workflow builds, tests, and publishes a Docker image to GHCR. Configure secrets as needed for deployment targets.
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render Deployment
+        run: |
+          # Ensure this is inside double quotes to handle the URL correctly
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
